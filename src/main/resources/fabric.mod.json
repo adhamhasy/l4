@@ -1,0 +1,25 @@
+{
+	"schemaVersion": 1,
+	"id": "melodia_lyrics",
+	"version": "${version}",
+	"name": "Melodia Lyrics",
+	"description": "The Show the Lyrics experience, wired to your own player: synced lyric bars floating in the world with typewriter/drop/rise animations, a corner now-playing card, karaoke highlight through word timings and the album accent colour. Reads Melodia's live status file and falls back to lrclib.",
+	"authors": [
+		"Melodia"
+	],
+	"contact": {},
+	"license": "MIT",
+	"icon": "assets/melodia_lyrics/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.melodia.lyrics.MelodiaLyricsClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
