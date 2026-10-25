@@ -4,7 +4,8 @@ plugins {
 }
 
 repositories {
-	// Loom adds the essential Minecraft / Fabric repositories automatically.
+	maven { name = 'Modrinth'; url = 'https://api.modrinth.com/maven' }
+	maven { name = 'TerraformersMC'; url = 'https://maven.terraformersmc.com/releases' }
 }
 
 loom {
@@ -22,6 +23,12 @@ dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// In-game config screen (replicates the original's YACL screen). 26.3 is unobfuscated,
+	// so plain implementation/compileOnly are enough (no remapping needed).
+	implementation "maven.modrinth:yacl:${project.yacl_version}"
+	// Optional: ModMenu integration (only loaded when ModMenu is installed).
+	compileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
 }
 
 processResources {

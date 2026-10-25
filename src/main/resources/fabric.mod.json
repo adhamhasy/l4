@@ -14,12 +14,19 @@
 	"entrypoints": {
 		"client": [
 			"com.melodia.lyrics.MelodiaLyricsClient"
+		],
+		"modmenu": [
+			"com.melodia.lyrics.gui.ModMenuIntegration"
 		]
 	},
 	"depends": {
 		"fabricloader": ">=0.19.5",
 		"minecraft": "26.3",
 		"java": ">=25",
-		"fabric-api": "*"
+		"fabric-api": "*",
+		"yet_another_config_lib_v3": ">=3.8.0"
+	},
+	"suggests": {
+		"modmenu": "*"
 	}
 }

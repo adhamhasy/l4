@@ -17,13 +17,16 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 /**
- * Owns the synced lyrics for the current track: disk cache first, then lrclib, then — when
- * Melodia itself is showing a line for the same song — a bridge-built fallback so the 3D
- * lyrics still work even if lrclib has nothing for the song.
+ * Owns the synced lyrics for the current track.
+ *
+ * <p>Resolution order: disk cache → lrclib.net → Melodia's own player bridge. Retries an empty
+ * result every few seconds so a song that started before Melodia finished loading its lyrics
+ * (or before the network came back) still ends up with lyrics instead of staying blank.
  */
 public final class LyricsService {
 	private static final Pattern UNSAFE_FILENAME = Pattern.compile("[^a-zA-Z0-9._-]+");
 	private static final int MAX_CACHE_NAME = 120;
+	private static final long RETRY_MS = 4000L;
 	private static LyricsService instance;
 
 	private final ExecutorService worker = Executors.newSingleThreadExecutor(runnable -> {
@@ -36,6 +39,8 @@ public final class LyricsService {
 	private volatile String currentKey = "";
 	private volatile boolean loading = false;
 	private volatile boolean usedBridge = false;
+	private volatile String lastBridgeLine = "";
+	private volatile long lastAttemptMs = 0L;
 
 	private LyricsService() {
 	}
@@ -55,7 +60,6 @@ public final class LyricsService {
 		return loading;
 	}
 
-	/** True when the displayed lyrics came from Melodia's own player rather than lrclib. */
 	public boolean usedBridge() {
 		return usedBridge;
 	}
@@ -66,20 +70,49 @@ public final class LyricsService {
 			return;
 		}
 		String key = track.getTrackKey();
-		if (key.equals(currentKey)) {
+		MelodiaSnapshot snapshot = track.snapshot();
+		String bridgeLine = snapshot == null ? "" : snapshot.line();
+
+		if (!key.equals(currentKey)) {
+			currentKey = key;
+			lyrics = Lyrics.EMPTY;
+			usedBridge = false;
+			lastBridgeLine = "";
+			lastAttemptMs = System.currentTimeMillis();
+			loading = true;
+			long mine = generation.incrementAndGet();
+			dispatch(mine, track, snapshot);
 			return;
 		}
-		currentKey = key;
-		lyrics = Lyrics.EMPTY;
-		loading = true;
-		long mine = generation.incrementAndGet();
+
+		// Same track: refresh the bridge when Melodia advances to a new line, and retry an
+		// empty result so a late-arriving lyric still shows up.
+		if (bridgeLine != null && !bridgeLine.isBlank() && !bridgeLine.equals(lastBridgeLine)) {
+			lastBridgeLine = bridgeLine;
+			if (usedBridge || lyrics == Lyrics.EMPTY) {
+				Lyrics bridged = fromBridge(key, snapshot);
+				if (bridged != null) {
+					lyrics = bridged;
+					usedBridge = true;
+				}
+			}
+		}
+		if (lyrics == Lyrics.EMPTY && !loading
+				&& System.currentTimeMillis() - lastAttemptMs >= RETRY_MS) {
+			lastAttemptMs = System.currentTimeMillis();
+			loading = true;
+			long mine = generation.incrementAndGet();
+			dispatch(mine, track, snapshot);
+		}
+	}
+
+	private void dispatch(long mine, TrackInfo track, MelodiaSnapshot snapshot) {
 		String artist = track.getArtist();
 		String title = track.getTitle();
 		String album = track.getAlbum();
 		long durationMs = track.getDurationMs();
-		MelodiaSnapshot bridge = track.snapshot();
 		worker.execute(() -> {
-			Lyrics parsed = load(key, artist, title, album, durationMs, bridge);
+			Lyrics parsed = load(track.getTrackKey(), artist, title, album, durationMs, snapshot);
 			if (generation.get() == mine) {
 				lyrics = parsed;
 				loading = false;
@@ -93,6 +126,8 @@ public final class LyricsService {
 		lyrics = Lyrics.EMPTY;
 		loading = false;
 		usedBridge = false;
+		lastBridgeLine = "";
+		lastAttemptMs = 0L;
 	}
 
 	private static Lyrics load(String key, String artist, String title, String album, long durationMs,
@@ -100,7 +135,12 @@ public final class LyricsService {
 		Path cached = cacheFile(key);
 		if (cached != null && Files.isReadable(cached)) {
 			try {
-				return LrcParser.parse(key, Files.readString(cached, StandardCharsets.UTF_8));
+				Lyrics parsed = LrcParser.parse(key, Files.readString(cached, StandardCharsets.UTF_8));
+				if (!parsed.isEmpty()) {
+					getInstance().usedBridge = false;
+					getInstance().lastBridgeLine = "";
+					return parsed;
+				}
 			} catch (IOException ignored) {
 			}
 		}
@@ -120,16 +160,13 @@ public final class LyricsService {
 		Lyrics bridged = fromBridge(key, bridge);
 		if (bridged != null) {
 			getInstance().usedBridge = true;
+			getInstance().lastBridgeLine = bridge == null ? "" : bridge.line();
 			return bridged;
 		}
 		getInstance().usedBridge = false;
 		return Lyrics.EMPTY;
 	}
 
-	/**
-	 * Builds a minimal but position-accurate Lyrics (current + next line) from what Melodia
-	 * reports, used when lrclib has no synced lyrics for the song.
-	 */
 	private static Lyrics fromBridge(String key, MelodiaSnapshot bridge) {
 		if (bridge == null || !bridge.hasLyrics() || bridge.line() == null || bridge.line().isBlank()) {
 			return null;

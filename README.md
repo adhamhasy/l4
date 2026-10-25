@@ -51,7 +51,7 @@ no network at runtime except lrclib lyric lookups.
 | Sync offset, wrap width, fonts, bold, uppercase, glow, shadow, bg | ✔ same options |
 | Karaoke fill (even spread) | ✔ + **word-timed fill** using Melodia's per-word timings |
 | Instrumental countdown dots, next-line preview | ✔ |
-| YACL config screen + ModMenu | ✖ → JSON config + `/melodia` commands (no extra deps) |
+| YACL config screen + ModMenu | ✔ via ModMenu (ModMenu optional; YACL required) |
 | lrclib fetch with cache | ✔ same strategy/UA |
 | Works when the song isn't on lrclib | ✔ falls back to Melodia's own synced lines |
 
@@ -141,7 +141,11 @@ Note: Minecraft 26.3 is unobfuscated, so the build has **no `mappings` line** on
 | `melodiaStatusFile` | Optional absolute path override to `now_playing.json` |
 | `showHud` | Optional flat HUD karaoke overlay (off by default) |
 
-### Commands (replaces the YACL screen)
+### Configure (ModMenu + YACL)
+
+With **ModMenu** and **YACL** installed, open *Mods → Melodia Lyrics → Configure* for the full
+GUI (widget position/scale/opacity, accent, 3D world settings, text style, extras, timing,
+HUD). Every option is also reachable through `/melodia` commands for headless setups.
 
 | Command | Effect |
 | --- | --- |
